@@ -199,8 +199,22 @@ function create_neutron_initial_network {
             sudo ip link set $PUBLIC_INTERFACE up
         fi
     else
-        NET_ID=$(openstack --os-cloud devstack --os-region "$REGION_NAME" network create "$PRIVATE_NETWORK_NAME" -f value -c id)
-        die_if_not_set $LINENO NET_ID "Failure creating NET_ID for $PRIVATE_NETWORK_NAME"
+        attempt_create_network() {
+            openstack --os-cloud devstack --os-region "$REGION_NAME" \
+                network create "$PRIVATE_NETWORK_NAME" -f value -c id
+        }
+
+        NET_ID=$(attempt_create_network || true)
+
+        if [ -z "$NET_ID" ]; then
+            echo "Initial network creation failed. Restarting Neutron/OVN and retrying..."
+            sudo systemctl restart devstack@q-svc.service
+            sleep 120
+
+            NET_ID=$(attempt_create_network || true)
+        fi
+
+        die_if_not_set $LINENO NET_ID "Failure creating NET_ID for $PRIVATE_NETWORK_NAME after retry"
 
         if [[ "$IP_VERSION" =~ 4.* ]]; then
             # Create IPv4 private subnet
