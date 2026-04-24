@@ -209,6 +209,7 @@ function create_neutron_initial_network {
         if [ -z "$NET_ID" ]; then
             echo "Initial network creation failed. Restarting Neutron/OVN and retrying..."
             sudo systemctl restart devstack@q-svc.service
+            sudo systemctl restart devstack@g-api
             sleep 120
 
             NET_ID=$(attempt_create_network || true)
